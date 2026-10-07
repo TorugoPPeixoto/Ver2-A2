@@ -80,34 +80,16 @@ def seed_default_data(conn: sqlite3.Connection, force: bool = False):
     now_dt = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     tomorrow_date = (datetime.now().date() + timedelta(days=1)).strftime("%Y-%m-%d")
 
-    default_users = [
+    default_users = [ # usuário para testes
         {
-            "cpf": 1,
+            "cpf": 12345678900,
             "password": "teste",
             "is_recurring": 1,
             "specific_date": None,
             "access_days": [0, 1, 2, 3, 4],  # Segunda a Sexta
             "access_hours": {"start": "08:00", "end": "18:00"},
             "active": 1,
-        },
-        {
-            "cpf": 2,
-            "password": "teste",
-            "is_recurring": 1,
-            "specific_date": None,
-            "access_days": [0, 1, 2, 3, 4, 5, 6],  # Segunda a Domingo
-            "access_hours": {"start": "08:00", "end": "18:00"},
-            "active": 1,
-        },
-        {
-            "cpf": 12345678900,
-            "password": "teste",
-            "is_recurring": 0,
-            "specific_date": tomorrow_date,
-            "access_days": [],
-            "access_hours": {"start": "08:00", "end": "18:00"},
-            "active": 1,
-        },
+        }
     ]
 
     for user in default_users:
