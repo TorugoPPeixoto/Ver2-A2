@@ -1,22 +1,21 @@
 import sys
 from pathlib import Path
+
+# Garante que o diretório do backend esteja no path mesmo quando este módulo
+# é importado de fora (ex.: pelo main.py da raiz e pelo reload do uvicorn)
+backend_dir = Path(__file__).resolve().parent
+if str(backend_dir) not in sys.path:
+    sys.path.insert(0, str(backend_dir))
+
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 import config
 
-backend_dir = Path(__file__).resolve().parent
-if str(backend_dir) not in sys.path:
-    sys.path.insert(0, str(backend_dir))
-
 from services import payload
 from db.connection import validate_user_access, get_payload_batch_size
 
-app = FastAPI(
-    title="ODS - Ver2-A2 API & Frontend",
-    version="0.1.0",
-    description="API FastAPI e Web App para o projeto Ver2-A2",
-)
+app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
@@ -59,4 +58,4 @@ def get_payload(cpf: int, password: str):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host=config.IP_ADRESS, port=config.PORT, reload=True)
+    uvicorn.run("app:app", host=config.IP_ADRESS, port=config.PORT, reload=True)

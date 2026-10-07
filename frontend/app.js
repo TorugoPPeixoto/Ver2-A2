@@ -112,13 +112,14 @@ function formatValidity(startDateStr, endDateStr) {
 }
 
 function hexToBytes(hex) {
-  if (!hex) return new Uint8Array(32);
+  if (!hex) return new Uint8Array(16);
   if (hex instanceof Uint8Array) return hex;
   if (typeof hex === "string") {
     const clean = hex.trim();
-    if (clean.length === 64) {
-      const bytes = new Uint8Array(32);
-      for (let i = 0; i < 64; i += 2) {
+    // Hex de tamanho par (32 chars = 16 bytes | 64 chars = 32 bytes)
+    if (/^[0-9a-fA-F]+$/.test(clean) && clean.length % 2 === 0) {
+      const bytes = new Uint8Array(clean.length / 2);
+      for (let i = 0; i < clean.length; i += 2) {
         bytes[i / 2] = parseInt(clean.substring(i, i + 2), 16);
       }
       return bytes;
@@ -251,17 +252,17 @@ function updateQRDisplay(payload) {
   const size = Math.min(box.clientWidth || 320, box.clientHeight || 320) || 320;
   box.innerHTML = "";
 
-  // Converte a payload criptografada (hex de 64 chars) para os 32 bytes binários exatos
+  // Converte a payload criptografada (hex de 32 chars) para os 16 bytes binários exatos
   const rawBytes = hexToBytes(payload.data);
 
-  // QR Code otimizado para 32 bytes:
-  // Versão 2 (25x25) com Error Correction Level L acomoda exatamente até 32 bytes.
-  // Produz um padrão limpo, espaçado e muito menos denso (25x25 vs 37x37).
+  // QR Code otimizado para 16 bytes:
+  // Versão 1 (21x21) com Error Correction Level L acomoda até 17 bytes em modo byte
+  // (o menor possível para os 16 bytes da payload criptografada).
   qrCodeInstance = new QRCode(box, {
     text: rawBytes,
     width: size,
     height: size,
-    typeNumber: 2,
+    typeNumber: 1,
     colorDark: "#000000",
     colorLight: "#F0F0F0",
     correctLevel: QRCode.CorrectLevel.L,
