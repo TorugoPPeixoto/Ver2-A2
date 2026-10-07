@@ -11,12 +11,26 @@ from utils.AES256 import encrypt
 from db.connection import get_user_by_cpf
 
 
+def cpf_base(cpf: int | str) -> int:
+    digits = "".join(ch for ch in str(cpf) if ch.isdigit())
+    return int(digits[:9]) if digits else 0
+
+
 def build_payload_bytes(cpf: int, data_inicial: datetime, data_final: datetime) -> bytes:
-    """Monta a payload em formato binário sem compressão (16 bytes)"""
+    """Monta a payload em formato binário (16 bytes):
+    - 4 bytes: CPF base (sem dígitos verificadores, max 999.999.999)
+    - 4 bytes: timestamp de início
+    - 4 bytes: timestamp de fim
+    - 4 bytes: reservado
+
+    O CPF pode vir completo (11 dígitos); apenas os 9 primeiros
+    (sem os dígitos verificadores) são gravados nos 4 bytes.
+    """
     return (
-        int(cpf).to_bytes(8, "big")
+        cpf_base(cpf).to_bytes(4, "big")
         + int(data_inicial.timestamp()).to_bytes(4, "big")
         + int(data_final.timestamp()).to_bytes(4, "big")
+        + b"\x00" * 4 # reservado
     )
 
 
@@ -24,26 +38,44 @@ compress = build_payload_bytes
 
 
 def get_dates(cpf: int, length: int = 1) -> List[List[datetime]]:
-    """Gera as próximas n datas para um usuário, ou apenas a disponível se não for recorrente"""
+    """Gera as próximas `length` janelas de acesso VÁLIDAS (não passadas).
+
+    - Recorrente: avança dia a dia e inclui apenas os dias da semana em `access_days`.
+    - Não-recorrente: parte da `specific_date` e gera `length` dias consecutivos.
+
+    Janelas cujo horário de fim já passou (`end <= agora`) são ignoradas,
+    garantindo que a primeira retornada seja a próxima janela válida.
+    """
     user = get_user_by_cpf(cpf)
-    if not user:
+    if not user or length <= 0:
         return []
 
     start = time.fromisoformat(user["access_hours"]["start"])
     end = time.fromisoformat(user["access_hours"]["end"])
+    now = datetime.now()
 
-    # Se não for recorrente, retorna apenas a data específica disponível
+    def window(day: date) -> List[datetime]:
+        return [datetime.combine(day, start), datetime.combine(day, end)]
+
+    def is_valid(day: date) -> bool:
+        return datetime.combine(day, end) > now
+
+    # Não-recorrente: dias consecutivos a partir da specific_date
     if not user.get("is_recurring", True):
-        d = date.fromisoformat(str(user["specific_date"])[:10])
-        return [[datetime.combine(d, start), datetime.combine(d, end)]]
+        first = date.fromisoformat(str(user["specific_date"])[:10])
+        return [
+            window(first + timedelta(days=offset))
+            for offset in range(length)
+            if is_valid(first + timedelta(days=offset))
+        ]
 
     if not user.get("access_days"):
         return []
 
     dates, day = [], date.today()
     while len(dates) < length:
-        if day.weekday() in user["access_days"]:
-            dates.append([datetime.combine(day, start), datetime.combine(day, end)])
+        if day.weekday() in user["access_days"] and is_valid(day):
+            dates.append(window(day))
         day += timedelta(days=1)
 
     return dates
